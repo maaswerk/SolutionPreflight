@@ -19,7 +19,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="MscrmTools.Xrm.Connection" Version="1.2025.9.64" />
     <PackageReference Include="XrmToolBoxPackage" Version="1.2025.10.74" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
   </ItemGroup>
 
   <!--

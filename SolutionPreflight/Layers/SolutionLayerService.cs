@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using Microsoft.Crm.Sdk.Messages;
 using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Query;
 using SolutionPreflight.Models;
 

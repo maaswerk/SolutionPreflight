@@ -1,7 +1,5 @@
-using System;
 using System.Collections.Generic;
 using Microsoft.Crm.Sdk.Messages;
-using Microsoft.Xrm.Sdk;
 using SolutionPreflight.Models;
 
 namespace SolutionPreflight.Analysis
@@ -40,7 +38,7 @@ namespace SolutionPreflight.Analysis
             var response = (RetrieveMissingComponentsResponse)context.TargetService.Execute(request);
 
             var missingComponents = response.MissingComponents;
-            if (missingComponents == null || missingComponents.Entities.Count == 0)
+            if (missingComponents == null || missingComponents.Length == 0)
             {
                 findings.Add(new PreflightFinding(
                     Severity.Info,
@@ -52,11 +50,12 @@ namespace SolutionPreflight.Analysis
                 return findings;
             }
 
-            foreach (var mc in missingComponents.Entities)
+            foreach (var mc in missingComponents)
             {
-                var displayName = mc.GetAttributeValue<string>("displayname") ?? "(unknown)";
-                var parentDisplayName = mc.GetAttributeValue<string>("parentdisplayname");
-                var componentType = DescribeType(mc);
+                var required = mc.RequiredComponent;
+                var displayName = required?.DisplayName ?? required?.SchemaName ?? "(unknown)";
+                var parentDisplayName = mc.DependentComponent?.DisplayName ?? mc.DependentComponent?.SchemaName;
+                var componentType = DescribeType(required);
 
                 var message = string.IsNullOrEmpty(parentDisplayName)
                     ? $"Component '{displayName}' ({componentType}) required by the solution is missing in the target."
@@ -78,27 +77,9 @@ namespace SolutionPreflight.Analysis
             return findings;
         }
 
-        private static string DescribeType(Entity missingComponent)
+        private static string DescribeType(ComponentDetail component)
         {
-            // Deliberately avoid GetAttributeValue<T>() here: if the SDK's actual attribute type
-            // doesn't match T it throws InvalidCastException instead of returning null, which would
-            // take down the whole check for every row. Inspect the raw value instead.
-            if (!missingComponent.Attributes.TryGetValue("type", out var raw) || raw == null)
-            {
-                return "unknown type";
-            }
-
-            switch (raw)
-            {
-                case OptionSetValue osv:
-                    return $"type {osv.Value}";
-                case int i:
-                    return $"type {i}";
-                case string s when !string.IsNullOrEmpty(s):
-                    return s;
-                default:
-                    return raw.ToString();
-            }
+            return component == null ? "unknown type" : $"type {component.Type}";
         }
     }
 }
