@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyTitle>Solution Preflight</AssemblyTitle>
+    <Product>Solution Preflight</Product>
+    <Description>XrmToolBox plugin that analyzes a Dataverse solution against a target environment before import and helps bulk-remove active solution layers.</Description>
+    <Company>Solution Preflight</Company>
+    <Copyright>Copyright (c) $([System.DateTime]::Now.Year)</Copyright>
+    <Version>1.0.0.0</Version>
+    <RootNamespace>SolutionPreflight</RootNamespace>
+    <AssemblyName>SolutionPreflight</AssemblyName>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <Platforms>AnyCPU</Platforms>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="XrmToolBoxPackage" Version="1.2025.10.74" />
+  </ItemGroup>
+
+  <!--
+    Convenience copy for local debugging with XrmToolBox's /overridepath switch:
+    xrmtoolbox.exe /overridepath:"<TargetDir>"
+    See README.md "Local debugging" section.
+  -->
+  <Target Name="CopyToXrmToolBoxPluginsFolder" AfterTargets="Build" Condition="'$(OS)' == 'Windows_NT' AND '$(CopyToXtbPlugins)' == 'true'">
+    <ItemGroup>
+      <XtbOutputFiles Include="$(TargetDir)**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(XtbOutputFiles)" DestinationFolder="$(AppData)\MscrmTools\XrmToolBox\Plugins\SolutionPreflight\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

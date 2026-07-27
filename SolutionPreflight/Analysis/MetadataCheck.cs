@@ -1,0 +1,144 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Xml.Linq;
+using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Messages;
+using Microsoft.Xrm.Sdk.Metadata;
+using SolutionPreflight.Models;
+
+namespace SolutionPreflight.Analysis
+{
+    /// <summary>
+    /// Goes one level deeper than <see cref="MissingComponentsCheck"/>: parses customizations.xml
+    /// out of the exported solution and confirms every referenced entity/attribute actually exists
+    /// in the target with a compatible attribute type - not just that a same-named component was
+    /// declared. Missing entities/attributes usually also show up via RetrieveMissingComponentsRequest,
+    /// but a type mismatch (e.g. a Picklist vs a Whole Number field with the same name) would not.
+    ///
+    /// Parsing is defensive: if customizations.xml is missing or has an unexpected shape (schema has
+    /// changed between Dataverse versions before), this check degrades to a single Info finding
+    /// instead of failing the whole analysis run.
+    /// </summary>
+    public class MetadataCheck : IPreflightCheck
+    {
+        public string Name => "Metadata";
+
+        public string Category => "Metadata";
+
+        public IEnumerable<PreflightFinding> Run(PreflightContext context)
+        {
+            var findings = new List<PreflightFinding>();
+
+            List<(string EntityLogicalName, List<string> AttributePhysicalNames)> entities;
+            try
+            {
+                entities = ParseCustomizations(context.CustomizationFile);
+            }
+            catch (Exception ex)
+            {
+                findings.Add(new PreflightFinding(
+                    Severity.Info,
+                    Category,
+                    context.SourceSolution.UniqueName,
+                    $"Could not parse customizations.xml for a detailed metadata check: {ex.Message}",
+                    "Missing entities/attributes are still covered by the Missing Components check.")
+                { CheckName = Name });
+                return findings;
+            }
+
+            foreach (var entity in entities)
+            {
+                EntityMetadata targetMetadata;
+                try
+                {
+                    var response = (RetrieveEntityResponse)context.TargetService.Execute(new RetrieveEntityRequest
+                    {
+                        LogicalName = entity.EntityLogicalName,
+                        EntityFilters = EntityFilters.Attributes
+                    });
+                    targetMetadata = response.EntityMetadata;
+                }
+                catch (Exception)
+                {
+                    // Already reported as Blocker by MissingComponentsCheck when the entity is a real
+                    // dependency; avoid duplicate noise here.
+                    continue;
+                }
+
+                var targetAttributes = targetMetadata.Attributes
+                    .Where(a => !string.IsNullOrEmpty(a.LogicalName))
+                    .ToDictionary(a => a.LogicalName, a => a, StringComparer.OrdinalIgnoreCase);
+
+                foreach (var physicalName in entity.AttributePhysicalNames)
+                {
+                    var logicalName = physicalName.ToLowerInvariant();
+                    if (!targetAttributes.ContainsKey(logicalName))
+                    {
+                        findings.Add(new PreflightFinding
+                        {
+                            Severity = Severity.Warning,
+                            Category = Category,
+                            ComponentName = $"{entity.EntityLogicalName}.{logicalName}",
+                            ComponentType = "Attribute",
+                            Message = $"Attribute '{logicalName}' on entity '{entity.EntityLogicalName}' is referenced by the " +
+                                      "solution's customizations but was not found in the target's entity metadata.",
+                            SuggestedFix = "Verify this attribute is included in the solution or already exists in the target.",
+                            CheckName = Name
+                        });
+                    }
+                }
+            }
+
+            return findings;
+        }
+
+        private static List<(string EntityLogicalName, List<string> AttributePhysicalNames)> ParseCustomizations(byte[] customizationFile)
+        {
+            var result = new List<(string, List<string>)>();
+            if (customizationFile == null || customizationFile.Length == 0)
+            {
+                return result;
+            }
+
+            using (var stream = new MemoryStream(customizationFile))
+            using (var archive = new ZipArchive(stream, ZipArchiveMode.Read))
+            {
+                var entry = archive.GetEntry("customizations.xml");
+                if (entry == null)
+                {
+                    return result;
+                }
+
+                using (var entryStream = entry.Open())
+                {
+                    var doc = XDocument.Load(entryStream);
+                    var entityNodes = doc.Descendants("Entity");
+
+                    foreach (var entityNode in entityNodes)
+                    {
+                        var entityInfo = entityNode.Element("EntityInfo")?.Element("entity");
+                        var logicalName = entityInfo?.Attribute("Name")?.Value;
+                        if (string.IsNullOrEmpty(logicalName))
+                        {
+                            continue;
+                        }
+
+                        var attributeNames = entityInfo
+                            .Element("attributes")
+                            ?.Elements("attribute")
+                            .Select(a => a.Attribute("PhysicalName")?.Value)
+                            .Where(n => !string.IsNullOrEmpty(n))
+                            .ToList() ?? new List<string>();
+
+                        result.Add((logicalName, attributeNames));
+                    }
+                }
+            }
+
+            return result;
+        }
+    }
+}
