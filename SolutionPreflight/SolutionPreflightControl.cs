@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using McTools.Xrm.Connection;
 using Microsoft.Crm.Sdk.Messages;
@@ -28,6 +29,7 @@ namespace SolutionPreflight
 
         private readonly SolutionLayerService _layerService = new SolutionLayerService();
         private PluginSettings _settings = new PluginSettings();
+        private readonly ToolTip _toolTip = new ToolTip { AutoPopDelay = 8000, InitialDelay = 400, ReshowDelay = 200 };
 
         public SolutionPreflightControl()
         {
@@ -35,6 +37,8 @@ namespace SolutionPreflight
             WireEvents();
             InitGridColumns();
             LoadSettings();
+            RefreshFindingsGrid();
+            RefreshLayersGrid();
         }
 
         private void WireEvents()
@@ -55,13 +59,20 @@ namespace SolutionPreflight
             cmbSeverityFilter.SelectedIndex = 0;
             cmbCategoryFilter.Items.Add("All");
             cmbCategoryFilter.SelectedIndex = 0;
+
+            _toolTip.SetToolTip(btnConnectTarget, "Connect to the Dataverse environment you want to import into.");
+            _toolTip.SetToolTip(btnRunAnalysis, "Exports the selected solution and runs every preflight check against the target.");
+            _toolTip.SetToolTip(btnRemoveSelectedLayers, "Removes the active (unmanaged) customization layer for the checked components in the TARGET environment. Cannot be undone.");
+            _toolTip.SetToolTip(btnSelectAllRemovable, "Checks every layer this tool can safely remove (see the Removable column).");
+            _toolTip.SetToolTip(rbManaged, "Simulates importing this solution as a managed solution.");
+            _toolTip.SetToolTip(rbUnmanaged, "Simulates importing this solution as an unmanaged solution.");
         }
 
         private void InitGridColumns()
         {
             dgvFindings.Columns.Clear();
-            dgvFindings.Columns.Add(new DataGridViewTextBoxColumn { Name = "Severity", DataPropertyName = "Severity", HeaderText = "Severity", FillWeight = 60 });
-            dgvFindings.Columns.Add(new DataGridViewTextBoxColumn { Name = "Category", DataPropertyName = "Category", HeaderText = "Category", FillWeight = 70 });
+            dgvFindings.Columns.Add(new DataGridViewTextBoxColumn { Name = "Severity", DataPropertyName = "Severity", HeaderText = "Severity", FillWeight = 65 });
+            dgvFindings.Columns.Add(new DataGridViewTextBoxColumn { Name = "Category", DataPropertyName = "Category", HeaderText = "Category", FillWeight = 80 });
             dgvFindings.Columns.Add(new DataGridViewTextBoxColumn { Name = "ComponentName", DataPropertyName = "ComponentName", HeaderText = "Component", FillWeight = 110 });
             dgvFindings.Columns.Add(new DataGridViewTextBoxColumn { Name = "Message", DataPropertyName = "Message", HeaderText = "Message", FillWeight = 220 });
             dgvFindings.Columns.Add(new DataGridViewTextBoxColumn { Name = "SuggestedFix", DataPropertyName = "SuggestedFix", HeaderText = "Suggested Fix", FillWeight = 220 });
@@ -89,18 +100,50 @@ namespace SolutionPreflight
                 return;
             }
 
+            var row = dgvFindings.Rows[e.RowIndex];
+            var columnName = dgvFindings.Columns[e.ColumnIndex].Name;
+
+            System.Drawing.Color background, text;
+            string severityIcon;
             switch (finding.Severity)
             {
                 case Severity.Blocker:
-                    dgvFindings.Rows[e.RowIndex].DefaultCellStyle.BackColor = System.Drawing.Color.MistyRose;
+                    background = UiTheme.BlockerBackground;
+                    text = UiTheme.BlockerText;
+                    severityIcon = "⛔";
                     break;
                 case Severity.Warning:
-                    dgvFindings.Rows[e.RowIndex].DefaultCellStyle.BackColor = System.Drawing.Color.LemonChiffon;
+                    background = UiTheme.WarningBackground;
+                    text = UiTheme.WarningText;
+                    severityIcon = "⚠";
                     break;
                 default:
-                    dgvFindings.Rows[e.RowIndex].DefaultCellStyle.BackColor = System.Drawing.Color.White;
+                    background = UiTheme.InfoBackground;
+                    text = UiTheme.InfoText;
+                    severityIcon = "ℹ";
                     break;
             }
+
+            row.DefaultCellStyle.BackColor = background;
+
+            if (columnName == "Severity")
+            {
+                e.Value = $"{severityIcon}  {finding.Severity}";
+                e.CellStyle.ForeColor = text;
+                e.CellStyle.Font = UiTheme.FontBodyBold;
+                e.FormattingApplied = true;
+            }
+            else if (columnName == "Category")
+            {
+                e.Value = FormatCategory(finding.Category);
+                e.FormattingApplied = true;
+            }
+        }
+
+        /// <summary>Turns a PascalCase category code ("ConnectionReference") into readable text ("Connection Reference").</summary>
+        private static string FormatCategory(string category)
+        {
+            return string.IsNullOrEmpty(category) ? category : Regex.Replace(category, "(?<!^)([A-Z])", " $1");
         }
 
         #region Connections
@@ -114,11 +157,13 @@ namespace SolutionPreflight
                 _targetService = newService;
                 _targetConnectionDetail = detail;
                 lblTargetStatus.Text = $"Target: {detail?.ConnectionName}";
+                lblTargetDot.ForeColor = UiTheme.Success;
                 Log($"Connected to target environment: {detail?.ConnectionName}");
             }
             else
             {
                 lblSourceStatus.Text = $"Source: {detail?.ConnectionName}";
+                lblSourceDot.ForeColor = UiTheme.Success;
                 Log($"Connected to source environment: {detail?.ConnectionName}");
                 LoadSourceSolutions();
             }
@@ -133,6 +178,7 @@ namespace SolutionPreflight
                 _targetService = null;
                 _targetConnectionDetail = null;
                 lblTargetStatus.Text = "Target: not connected";
+                lblTargetDot.ForeColor = UiTheme.Neutral;
                 UpdateRunButtonState();
             }
         }
@@ -352,9 +398,13 @@ namespace SolutionPreflight
             var ordered = filtered.OrderByDescending(f => f.Severity).ThenBy(f => f.Category).ToList();
             dgvFindings.DataSource = ordered;
 
-            lblFindingsSummary.Text = $"Blockers: {_findings.Count(f => f.Severity == Severity.Blocker)}  " +
-                                       $"Warnings: {_findings.Count(f => f.Severity == Severity.Warning)}  " +
-                                       $"Info: {_findings.Count(f => f.Severity == Severity.Info)}";
+            lblBadgeBlocker.Text = $"⛔ {_findings.Count(f => f.Severity == Severity.Blocker)} Blockers";
+            lblBadgeWarning.Text = $"⚠ {_findings.Count(f => f.Severity == Severity.Warning)} Warnings";
+            lblBadgeInfo.Text = $"ℹ {_findings.Count(f => f.Severity == Severity.Info)} Info";
+
+            var hasFindings = _findings.Count > 0;
+            dgvFindings.Visible = hasFindings;
+            lblFindingsEmpty.Visible = !hasFindings;
         }
 
         private void ExportReport()
@@ -433,6 +483,10 @@ namespace SolutionPreflight
         {
             dgvLayers.DataSource = null;
             dgvLayers.DataSource = _layers;
+
+            var hasLayers = _layers.Count > 0;
+            dgvLayers.Visible = hasLayers;
+            lblLayersEmpty.Visible = !hasLayers;
         }
 
         private void SelectAllRemovableLayers()

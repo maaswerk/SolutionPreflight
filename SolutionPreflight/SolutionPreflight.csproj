@@ -6,8 +6,9 @@
     <AssemblyTitle>Solution Preflight</AssemblyTitle>
     <Product>Solution Preflight</Product>
     <Description>XrmToolBox plugin that analyzes a Dataverse solution against a target environment before import and helps bulk-remove active solution layers.</Description>
-    <Company>Solution Preflight</Company>
-    <Copyright>Copyright (c) $([System.DateTime]::Now.Year)</Copyright>
+    <Authors>Fabian Maas</Authors>
+    <Company>Fabian Maas</Company>
+    <Copyright>Copyright (c) $([System.DateTime]::Now.Year) Fabian Maas</Copyright>
     <Version>1.0.0.0</Version>
     <RootNamespace>SolutionPreflight</RootNamespace>
     <AssemblyName>SolutionPreflight</AssemblyName>
