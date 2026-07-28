@@ -6,7 +6,7 @@ likely to fail or need manual follow-up - with concrete suggested fixes. It also
 Solution Layer Management view to bulk-inspect and remove active (unmanaged) solution layers in
 the target.
 
-See [CLAUDE.md](CLAUDE.md) for the full design brief, architecture rationale, and open points.
+**Author:** Fabian Maas
 
 ## What it checks
 
@@ -99,5 +99,5 @@ install.
     /Models                            # PreflightFinding, Severity, ComponentLayerInfo, SolutionSummary
     /Export                            # ReportExporter (Markdown/CSV/HTML)
     /Settings                          # PluginSettings (persisted via XrmToolBox SettingsManager)
-  CLAUDE.md                            # design brief / open points
+    /Resources                         # Plugin icon source PNGs
 ```
