@@ -74,6 +74,13 @@ möglich ist. Alles andere wird als "nicht automatisch entfernbar" markiert, dam
 Ungewolltes gelöscht wird. Vor dem eigentlichen Löschen gibt es immer eine Bestätigung mit
 Vorschau.
 
+## Woher wissen wir, dass die Prüfungen die richtigen Dinge finden?
+
+Die Prüfungen orientieren sich an real aufgetretenen Import-/Uninstall-Fehlern aus der Praxis.
+[KNOWN_ISSUES.md](KNOWN_ISSUES.md) zeigt eine konkrete Liste solcher Fehlerbilder (mit Fehlercode)
+und ob bzw. wodurch Solution Preflight sie erkennt – und erklärt auch, warum ein paar sehr
+spezifische oder rein technische/transiente Fälle bewusst nicht automatisiert wurden.
+
 ## Installation & Nutzung
 
 1. [XrmToolBox](https://www.xrmtoolbox.com/) installieren, falls noch nicht vorhanden.
