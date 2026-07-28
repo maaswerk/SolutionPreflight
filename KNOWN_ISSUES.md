@@ -11,10 +11,10 @@ ob bzw. wodurch Solution Preflight sie erkennt:
 
 | # | Fehlercode | Fehlerbild (kurz) | Erkannt? | Check |
 |---|---|---|---|---|
-| 1 | 8004F020 | RibbonCustomization – blockiert durch andere managed Layer | ✅ | Solution Layers |
-| 2 | 8004F020 | EntityRelationship – gleiches Fehlerbild | ✅ | Solution Layers |
-| 3 | 8004F020 | EntityMap / AttributeMap – gleiches Fehlerbild | ✅ | Solution Layers |
-| 4 | 8004F020 | CustomAPIResponseProperty – gleiches Fehlerbild | ✅ | Solution Layers |
+| 1 | 8004F020 | RibbonCustomization – blockiert durch andere managed Layer | ✅ | Solution Layers + Dependent Components |
+| 2 | 8004F020 | EntityRelationship – gleiches Fehlerbild | ✅ | Solution Layers + Dependent Components |
+| 3 | 8004F020 | EntityMap / AttributeMap – gleiches Fehlerbild | ✅ | Solution Layers + Dependent Components |
+| 4 | 8004F020 | CustomAPIResponseProperty – gleiches Fehlerbild | ✅ | Solution Layers + Dependent Components |
 | 5 | 80047009 | SLA-Systemfeld, weil SLA im Ziel deaktiviert ist | ❌ | – (siehe Begründung unten) |
 | 6 | 80095005 | Connection Reference fehlt bei Flow-Publish | ✅ | Connection References + Cloud Flow Activation |
 | 7 | 80040227 | WebResource/Theme Cascade-Restrict | ❌ | – (siehe Begründung unten) |
@@ -27,8 +27,8 @@ ob bzw. wodurch Solution Preflight sie erkennt:
 | 14 | — (Import) | Primary-Name-Attribute-Konflikt zwischen Umgebungen | ✅ | Metadata |
 | 15 | — (Import) | EntityRelationship existiert im Ziel bereits anders | ❌ | – (siehe Begründung unten) |
 | 16 | — (Import) | Rollup-Feld zwischen Umgebungen inkonsistent | ❌ | – (siehe Begründung unten) |
-| 17 | — (Uninstall) | Aktiver Workflow/BPF-Layer blockiert Löschung | ✅ (teilweise) | Solution Layers |
-| 18 | — (Uninstall) | "Solution dependencies exist, cannot uninstall" | ✅ (teilweise) | Solution Layers |
+| 17 | — (Uninstall) | Aktiver Workflow/BPF-Layer blockiert Löschung | ✅ (teilweise) | Solution Layers + Dependent Components |
+| 18 | — (Uninstall) | "Solution dependencies exist, cannot uninstall" | ✅ | Solution Layers + Dependent Components |
 
 ### Warum #5, #7, #15, #16 nicht automatisiert sind
 
@@ -51,9 +51,9 @@ Alle 45 Artikel aus dem offiziellen Troubleshooting-Bereich, einzeln geprüft.
 | an-error-calculating-dependencies | Fehlende Abhängigkeits-Komponente beim Import | ✅ | Missing Components |
 | assembly-version-error-importing-dynamics-365-solution | Plugin-Assembly nutzt zu alte .NET-Framework-Version | ❌ | müsste Assembly-Manifest im Solution-Zip inspizieren – noch nicht umgesetzt |
 | cannot-import-solutions-publish-changes | Import/Publish läuft bereits, zweiter Vorgang kollidiert | ❌ | Race Condition zur Laufzeit, nicht vorab prüfbar |
-| cannot-uninstall-solution-error-when-deleting-solution | Uninstall blockiert durch andere managed Solution | ✅ (teilweise) | Solution Layers |
+| cannot-uninstall-solution-error-when-deleting-solution | Uninstall blockiert durch andere managed Solution | ✅ | Solution Layers + Dependent Components |
 | changes-not-effective-solution-import | Update kommt an, wirkt aber nicht (Layer blockiert) | ✅ | Solution Layers |
-| circular-dependencies-between-solutions | Zwei Solutions hängen zirkulär voneinander ab | ❌ | bräuchte `RetrieveDependentComponentsRequest` je Komponente – Antwortschema noch nicht sicher genug verifiziert, bewusst nicht geraten |
+| circular-dependencies-between-solutions | Zwei Solutions hängen zirkulär voneinander ab | ✅ NEU | Dependent Components (erkennt gegenseitige Fremd-Abhängigkeiten je Komponente) |
 | concurrent-solution-operation-failures | Gleichzeitige Solution-Operationen kollidieren | ❌ | Laufzeit-/Nebenläufigkeitsproblem, nicht vorab prüfbar |
 | dataverse-environment-variables | Environment-Variable-Werte scheinbar nicht aktuell | ⚠️ teilweise | Environment Variables prüft fehlenden Wert bereits; Browser-Cache/SharePoint-URL-Kollision nicht erkennbar |
 | duplicate-security-roles | Import legt Rolle mit bereits vergebenem Namen doppelt an | ✅ NEU | Security Roles (Namenskonflikt mit abweichender ID) |
@@ -73,13 +73,13 @@ Alle 45 Artikel aus dem offiziellen Troubleshooting-Bereich, einzeln geprüft.
 | maximum-row-size-exceeds | Neue Felder sprengen SQL-Zeilenlimit (8060 Byte) | ❌ | Byte-genaue SQL-Schätzung zu unsicher, keine Garantie |
 | missing-dependency-on-solution-import | Abhängige App/Komponente fehlt im Ziel | ✅ | Missing Components |
 | missing-sales-dependency-on-solution-import | Sales-/Erstanbieter-App fehlt oder falsche Version | ❌ | Lizenz-/Entitlement-Status nicht per SDK sichtbar |
-| multiple-publisher-shared-component-failure | Cross-Publisher-Layer blockiert Uninstall | ✅ (teilweise) | Solution Layers (erkennt Fremd-Layer generell, noch ohne Publisher-Zuordnung je Layer) |
+| multiple-publisher-shared-component-failure | Cross-Publisher-Layer blockiert Uninstall | ✅ | Solution Layers + Dependent Components |
 | my-apps-area-is-missing | Sitemap-Änderung entfernt "My Apps" | ❌ | zu spezifisch/geringe Praxisrelevanz |
 | newly-added-components-dont-appear | App-Komponentenliste wechselt von einzeln zu "Alle" | ❌ | zu spezifisch |
 | primaryname-attribute-not-found | Primary-Name-Attribut fehlt im Solution-Export | ✅ NEU | Metadata |
 | schemaType-mismatch-on-solution-import | Quelle hat höheren Schema-Tier als Ziel | ❌ | benötigtes Metadatenfeld nicht sicher genug verifiziert |
-| solution-cannot-be-deleted-due-to-dependencies | Löschung durch Abhängigkeiten blockiert | ✅ (teilweise) | Solution Layers |
-| solution-cannot-be-deleted | Gleiches Fehlerbild | ✅ (teilweise) | Solution Layers |
+| solution-cannot-be-deleted-due-to-dependencies | Löschung durch Abhängigkeiten blockiert | ✅ | Dependent Components |
+| solution-cannot-be-deleted | Gleiches Fehlerbild | ✅ | Dependent Components |
 | solution-checker-enforcement-import-issues | Managed Environment blockt Import wegen Solution-Checker-Verstößen | ❌ | erfordert externen Solution-Checker-Service-Aufruf, außerhalb des Scopes |
 | the-import-file-is-too-large-upload | Irreführende Fehlermeldung durch Schema-Namens-Kollision (Groß-/Kleinschreibung) | ❌ | Mechanismus nicht mit ausreichender Sicherheit verifiziert |
 | the-import-of-solution-failed-error-when-importing-solution | Feldtyp-Konflikt (z. B. Boolean vs. Picklist) | ✅ | Metadata |
@@ -104,13 +104,20 @@ Alle 45 Artikel aus dem offiziellen Troubleshooting-Bereich, einzeln geprüft.
 - **Form XML**: Formular ist als `unmodified="1"` markiert und wird beim Import daher übersprungen.
 - **Solution Package Integrity**: exportiertes Zip-Paket enthält nicht alle Pflichtdateien.
 - **Security Roles (erweitert)**: Rollenname existiert im Ziel bereits unter einer anderen Rollen-ID.
+- **Dependent Components** (neu, per `RetrieveDependentComponentsRequest`): fragt für **jede**
+  Komponente dieser Solution direkt im Ziel nach, ob eine Komponente aus einer *anderen,
+  fremden* Solution aktuell davon abhängt (erkannt über das `dependentcomponentbasesolutionid`-Feld
+  der zurückgegebenen `dependency`-Datensätze – ohne die numerischen Component-Type-Codes
+  interpretieren zu müssen). Das ist exakt das Muster hinter Fehler 8004F020
+  ("blocked by other managed layers") und den verschiedenen "solution dependencies exist, cannot
+  uninstall/delete"-Fehlern: Eine völlig unabhängige Solution hängt noch an einer Komponente, die
+  diese Solution ändern oder entfernen will.
 
 ### Bewusst zurückgestellt (nicht geraten)
 
 Ein paar als "Yes"/"Partially" eingestufte Fälle wurden **nicht** umgesetzt, weil die exakte
 API-Antwortstruktur oder das genaue XML-/Metadaten-Detail nicht mit ausreichender Sicherheit
-verifiziert werden konnte (u. a. zirkuläre/fremde Abhängigkeiten über
-`RetrieveDependentComponentsRequest`, Sprachpaket-Prüfung, Web-Resource-Größenschätzung,
+verifiziert werden konnte (u. a. Sprachpaket-Prüfung, Web-Resource-Größenschätzung,
 Schema-Namens-Kollisionen bei Groß-/Kleinschreibung, Fallback-Formular-Erkennung). Für diese gilt
 das gleiche Prinzip wie überall in diesem Tool: lieber kein Check als einer, der auf einer Vermutung
 statt auf einer verifizierten API basiert.

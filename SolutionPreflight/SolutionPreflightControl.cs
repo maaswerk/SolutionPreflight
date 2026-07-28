@@ -298,6 +298,7 @@ namespace SolutionPreflight
                         new SolutionVersionCheck(),
                         new PlatformVersionCheck(),
                         new SolutionLayerCheck(),
+                        new DependentComponentsCheck(),
                         new ConnectionReferenceCheck(),
                         new CloudFlowCheck(),
                         new MetadataCheck(),
