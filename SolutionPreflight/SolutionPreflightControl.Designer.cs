@@ -85,30 +85,39 @@ namespace SolutionPreflight
 
         private void BuildHeader()
         {
-            pnlHeader = new Panel { Dock = DockStyle.Top, Height = 62, BackColor = UiTheme.PrimaryDark, Padding = new Padding(16, 0, 16, 0) };
+            pnlHeader = new Panel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                BackColor = UiTheme.PrimaryDark,
+                Padding = new Padding(18, 8, 16, 10)
+            };
 
             lblAppTitle = new Label
             {
                 Text = "Solution Preflight",
+                Dock = DockStyle.Top,
                 AutoSize = true,
                 Font = UiTheme.FontHeader,
                 ForeColor = Color.White,
-                Location = new Point(16, 8),
                 BackColor = Color.Transparent
             };
 
             lblAppSubtitle = new Label
             {
                 Text = "Validate a Dataverse solution against a target environment before you import it",
+                Dock = DockStyle.Top,
                 AutoSize = true,
                 Font = UiTheme.FontSubHeader,
                 ForeColor = ColorTranslator.FromHtml("#B7C6DC"),
-                Location = new Point(18, 36),
                 BackColor = Color.Transparent
             };
 
-            pnlHeader.Controls.Add(lblAppTitle);
+            // lblAppSubtitle must visually sit BELOW the title, so it is added first (see the
+            // docking-order note in BuildSetupTab: the last control added claims the top first).
             pnlHeader.Controls.Add(lblAppSubtitle);
+            pnlHeader.Controls.Add(lblAppTitle);
         }
 
         private void TabMain_DrawItem(object sender, DrawItemEventArgs e)
@@ -138,16 +147,28 @@ namespace SolutionPreflight
         {
             tabSetup = new TabPage("Setup / Run") { BackColor = UiTheme.PageBackground };
 
+            // AutoSize + Dock=Top so the card always grows to fit its rows, regardless of DPI/font
+            // scaling. Rows below are also Dock=Top FlowLayoutPanels for the same reason - fixed
+            // pixel Location/Height (the previous approach) gets cut off whenever the actual font
+            // metrics differ from what was assumed at design time.
             pnlSetupCard = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 200,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 BackColor = UiTheme.CardBackground,
-                Padding = new Padding(18, 14, 18, 14),
-                Margin = new Padding(12)
+                Padding = new Padding(18, 14, 18, 10)
             };
 
-            var connectionsRow = new FlowLayoutPanel { Location = new Point(18, 14), AutoSize = true, FlowDirection = FlowDirection.LeftToRight };
+            var connectionsRow = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = true,
+                Padding = new Padding(0, 0, 0, 12)
+            };
             lblSourceDot = new Label { Text = "●", AutoSize = true, ForeColor = UiTheme.Neutral, Font = new Font("Segoe UI", 11f), Margin = new Padding(0, 3, 4, 0) };
             lblSourceStatus = new Label { Text = "Source: not connected", AutoSize = true, Font = UiTheme.FontBodyBold, ForeColor = UiTheme.TextPrimary, Margin = new Padding(0, 5, 24, 0) };
             lblTargetDot = new Label { Text = "●", AutoSize = true, ForeColor = UiTheme.Neutral, Font = new Font("Segoe UI", 11f), Margin = new Padding(0, 3, 4, 0) };
@@ -161,7 +182,15 @@ namespace SolutionPreflight
             connectionsRow.Controls.Add(lblTargetStatus);
             connectionsRow.Controls.Add(btnConnectTarget);
 
-            var solutionRow = new FlowLayoutPanel { Location = new Point(18, 56), AutoSize = true, FlowDirection = FlowDirection.LeftToRight };
+            var solutionRow = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = true,
+                Padding = new Padding(0, 0, 0, 12)
+            };
             lblSolution = new Label { Text = "Solution (from source):", AutoSize = true, Font = UiTheme.FontBody, Margin = new Padding(0, 6, 8, 0) };
             cmbSolutions = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 340, Margin = new Padding(0, 2, 8, 0) };
             UiTheme.StyleComboBox(cmbSolutions);
@@ -172,7 +201,15 @@ namespace SolutionPreflight
             solutionRow.Controls.Add(cmbSolutions);
             solutionRow.Controls.Add(btnRefreshSolutions);
 
-            var importRow = new FlowLayoutPanel { Location = new Point(18, 96), AutoSize = true, FlowDirection = FlowDirection.LeftToRight };
+            var importRow = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = true,
+                Padding = new Padding(0, 0, 0, 16)
+            };
             lblImportType = new Label { Text = "Import as:", AutoSize = true, Font = UiTheme.FontBody, Margin = new Padding(0, 6, 10, 0) };
             rbManaged = new RadioButton { Text = "Managed", Checked = true, AutoSize = true, Margin = new Padding(0, 4, 16, 0) };
             rbUnmanaged = new RadioButton { Text = "Unmanaged", AutoSize = true, Margin = new Padding(0, 4, 0, 0) };
@@ -181,11 +218,20 @@ namespace SolutionPreflight
             importRow.Controls.Add(rbManaged);
             importRow.Controls.Add(rbUnmanaged);
 
+            var runRow = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = true
+            };
+
             btnRunAnalysis = new Button
             {
                 Text = "▶  Run Preflight Analysis",
-                Location = new Point(18, 134),
                 Size = new Size(240, 38),
+                Margin = new Padding(0, 0, 16, 0),
                 Enabled = false
             };
             UiTheme.StylePrimaryButton(btnRunAnalysis);
@@ -193,17 +239,22 @@ namespace SolutionPreflight
             lblRunHint = new Label
             {
                 Text = "Runs all checks against the target and reads active solution layers.",
-                Location = new Point(272, 145),
                 AutoSize = true,
+                MaximumSize = new Size(320, 0),
                 Font = UiTheme.FontSubHeader,
-                ForeColor = UiTheme.TextSecondary
+                ForeColor = UiTheme.TextSecondary,
+                Margin = new Padding(0, 12, 0, 0)
             };
 
-            pnlSetupCard.Controls.Add(connectionsRow);
-            pnlSetupCard.Controls.Add(solutionRow);
+            runRow.Controls.Add(btnRunAnalysis);
+            runRow.Controls.Add(lblRunHint);
+
+            // Added in reverse visual order: WinForms docks the LAST-added control against its
+            // edge first, so the control meant to appear at the very top must be added last.
+            pnlSetupCard.Controls.Add(runRow);
             pnlSetupCard.Controls.Add(importRow);
-            pnlSetupCard.Controls.Add(btnRunAnalysis);
-            pnlSetupCard.Controls.Add(lblRunHint);
+            pnlSetupCard.Controls.Add(solutionRow);
+            pnlSetupCard.Controls.Add(connectionsRow);
 
             lblProgressTitle = new Label
             {
@@ -240,9 +291,17 @@ namespace SolutionPreflight
         {
             tabFindings = new TabPage("Findings") { BackColor = UiTheme.PageBackground };
 
-            pnlFindingsToolbar = new Panel { Dock = DockStyle.Top, Height = 52, BackColor = UiTheme.CardBackground };
+            pnlFindingsToolbar = new Panel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.CardBackground };
 
-            var filterRow = new FlowLayoutPanel { Location = new Point(14, 10), AutoSize = true, FlowDirection = FlowDirection.LeftToRight };
+            var filterRow = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Left,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = true,
+                Padding = new Padding(14, 10, 0, 10)
+            };
             lblSeverityFilter = new Label { Text = "Severity:", AutoSize = true, Font = UiTheme.FontBody, Margin = new Padding(0, 7, 4, 0) };
             cmbSeverityFilter = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 110, Margin = new Padding(0, 3, 20, 0) };
             UiTheme.StyleComboBox(cmbSeverityFilter);
@@ -260,10 +319,12 @@ namespace SolutionPreflight
 
             pnlSummaryBadges = new FlowLayoutPanel
             {
+                Dock = DockStyle.Right,
                 AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 FlowDirection = FlowDirection.LeftToRight,
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                Location = new Point(600, 8)
+                WrapContents = true,
+                Padding = new Padding(0, 10, 14, 10)
             };
             lblBadgeBlocker = UiTheme.CreateBadge("0 Blockers", UiTheme.BlockerBackground, UiTheme.BlockerText);
             lblBadgeWarning = UiTheme.CreateBadge("0 Warnings", UiTheme.WarningBackground, UiTheme.WarningText);
@@ -307,9 +368,17 @@ namespace SolutionPreflight
         {
             tabLayers = new TabPage("Solution Layers") { BackColor = UiTheme.PageBackground };
 
-            pnlLayersToolbar = new Panel { Dock = DockStyle.Top, Height = 52, BackColor = UiTheme.CardBackground };
+            pnlLayersToolbar = new Panel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.CardBackground };
 
-            var row = new FlowLayoutPanel { Location = new Point(14, 9), AutoSize = true, FlowDirection = FlowDirection.LeftToRight };
+            var row = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = true,
+                Padding = new Padding(14, 9, 0, 9)
+            };
             btnRefreshLayers = new Button { Text = "⟳ Refresh Active Layers", AutoSize = true, Padding = new Padding(10, 5, 10, 5), Margin = new Padding(0, 1, 8, 0) };
             UiTheme.StyleSecondaryButton(btnRefreshLayers);
             btnSelectAllRemovable = new Button { Text = "Select All Removable", AutoSize = true, Padding = new Padding(10, 5, 10, 5), Margin = new Padding(0, 1, 8, 0) };
