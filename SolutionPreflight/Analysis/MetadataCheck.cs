@@ -57,7 +57,7 @@ namespace SolutionPreflight.Analysis
                     var response = (RetrieveEntityResponse)context.TargetService.Execute(new RetrieveEntityRequest
                     {
                         LogicalName = entity.EntityLogicalName,
-                        EntityFilters = EntityFilters.Attributes
+                        EntityFilters = EntityFilters.Entity | EntityFilters.Attributes
                     });
                     targetMetadata = response.EntityMetadata;
                 }
@@ -76,7 +76,7 @@ namespace SolutionPreflight.Analysis
                     var sourceResponse = (RetrieveEntityResponse)context.SourceService.Execute(new RetrieveEntityRequest
                     {
                         LogicalName = entity.EntityLogicalName,
-                        EntityFilters = EntityFilters.Attributes
+                        EntityFilters = EntityFilters.Entity | EntityFilters.Attributes
                     });
                     sourceMetadata = sourceResponse.EntityMetadata;
                 }
@@ -102,6 +102,60 @@ namespace SolutionPreflight.Analysis
                                        "has been known to make the import fail outright.",
                         CheckName = Name
                     });
+                }
+
+                if (sourceMetadata != null && !string.IsNullOrEmpty(sourceMetadata.PrimaryNameAttribute) &&
+                    !entity.AttributePhysicalNames.Any(a => string.Equals(a, sourceMetadata.PrimaryNameAttribute, StringComparison.OrdinalIgnoreCase)))
+                {
+                    findings.Add(new PreflightFinding
+                    {
+                        Severity = Severity.Warning,
+                        Category = Category,
+                        ComponentName = entity.EntityLogicalName,
+                        ComponentType = "Entity",
+                        Message = $"Entity '{entity.EntityLogicalName}' is included in this solution, but its primary name " +
+                                  $"attribute ('{sourceMetadata.PrimaryNameAttribute}') isn't among the exported attributes. " +
+                                  "Dataverse can reject the import with \"PrimaryName attribute not found\".",
+                        SuggestedFix = "In the source, remove and re-add this table (with all its assets) to the solution so the " +
+                                       "primary name attribute is captured, then re-export.",
+                        CheckName = Name
+                    });
+                }
+
+                if (sourceMetadata?.Keys != null && targetMetadata.Keys != null)
+                {
+                    foreach (var sourceKey in sourceMetadata.Keys)
+                    {
+                        var sourceKeyAttributes = new HashSet<string>(sourceKey.KeyAttributes ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+                        if (sourceKeyAttributes.Count == 0)
+                        {
+                            continue;
+                        }
+
+                        foreach (var targetKey in targetMetadata.Keys)
+                        {
+                            var targetKeyAttributes = new HashSet<string>(targetKey.KeyAttributes ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+                            var sameAttributes = sourceKeyAttributes.SetEquals(targetKeyAttributes);
+                            var sameKeyName = string.Equals(sourceKey.LogicalName, targetKey.LogicalName, StringComparison.OrdinalIgnoreCase);
+
+                            if (sameAttributes && !sameKeyName)
+                            {
+                                findings.Add(new PreflightFinding
+                                {
+                                    Severity = Severity.Blocker,
+                                    Category = Category,
+                                    ComponentName = $"{entity.EntityLogicalName}.{sourceKey.LogicalName}",
+                                    ComponentType = "Entity Key",
+                                    Message = $"Entity key '{sourceKey.LogicalName}' on '{entity.EntityLogicalName}' uses the same " +
+                                              $"attribute(s) as the target's existing key '{targetKey.LogicalName}'. Dataverse rejects " +
+                                              "an entity key whose attribute set duplicates one already present.",
+                                    SuggestedFix = "Remove or rename the conflicting key in the target, or align the key names between " +
+                                                   "environments before importing.",
+                                    CheckName = Name
+                                });
+                            }
+                        }
+                    }
                 }
 
                 var targetAttributes = targetMetadata.Attributes
