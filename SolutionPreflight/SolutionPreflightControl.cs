@@ -5,7 +5,6 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using McTools.Xrm.Connection;
-using Microsoft.Crm.Sdk.Messages;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 using SolutionPreflight.Analysis;
@@ -286,13 +285,9 @@ namespace SolutionPreflight
                     void Report(string message) => worker.ReportProgress(0, message);
 
                     Report($"Exporting solution '{solution.UniqueName}' from source (unmanaged, for analysis only)...");
-                    var exportResponse = (ExportSolutionResponse)Service.Execute(new ExportSolutionRequest
-                    {
-                        SolutionName = solution.UniqueName,
-                        Managed = false
-                    });
+                    var customizationFile = SolutionExportService.ExportUnmanaged(Service, solution.UniqueName, Report);
 
-                    var context = new PreflightContext(Service, _targetService, solution, exportResponse.ExportSolutionFile, importAsManaged, Report);
+                    var context = new PreflightContext(Service, _targetService, solution, customizationFile, importAsManaged, Report);
 
                     var checks = new List<IPreflightCheck>
                     {
