@@ -37,10 +37,10 @@ flowchart TD
 
 | Frage | Was da im Hintergrund geprüft wird |
 |---|---|
-| 🧩 Vollständigkeit | Fehlende Tabellen, Felder und Steuerelemente (z. B. PCF-Komponenten), die die Solution benötigt |
-| 🔗 Verbindungen & Automatisierung | Ob Cloud-Flow-Verbindungen im Ziel existieren und ob Flows nach dem Import erst wieder manuell aktiviert werden müssen |
-| ⚙️ Einstellungen & Werte | Ob Umgebungsvariablen im Ziel einen sinnvollen Wert haben und ob importierte Sicherheitsrollen überhaupt jemandem zugewiesen sind |
-| 🕰️ Altlasten im Ziel | Ob der Solution-Herausgeber (Publisher) passt, ob sich der Solution-Typ (managed/unmanaged) ändern würde, und ob alte, nicht verwaltete Anpassungen ("Layer") das Update verdecken könnten |
+| 🧩 Vollständigkeit | Fehlende Tabellen, Felder und Steuerelemente (z. B. PCF-Komponenten), die die Solution benötigt, sowie ob das exportierte Solution-Paket selbst unbeschädigt ist |
+| 🔗 Verbindungen & Automatisierung | Ob Cloud-Flow-Verbindungen im Ziel existieren – auch die, die ein Flow nur noch intern braucht, aber nicht mehr als Solution-Bestandteil gelistet ist – und ob Flows nach dem Import erst wieder manuell aktiviert werden müssen |
+| ⚙️ Einstellungen & Werte | Ob Umgebungsvariablen im Ziel einen sinnvollen Wert haben, ob importierte Sicherheitsrollen überhaupt jemandem zugewiesen sind (oder mit einer bereits existierenden Rolle gleichen Namens kollidieren), und ob Formulare wegen fehlender Änderungen beim Import einfach übersprungen würden |
+| 🕰️ Altlasten im Ziel | Ob der Solution-Herausgeber (Publisher) passt, ob sich der Solution-Typ (managed/unmanaged) ändern würde, ob die Solution-Version überhaupt höher ist als die bereits installierte, ob Quelle und Ziel auf unterschiedlichen Dataverse-Versionen laufen, ob alte, nicht verwaltete Anpassungen ("Layer") das Update verdecken könnten, und ob eine völlig fremde, unabhängige Solution im Ziel noch an einer Komponente "hängt", die diese Solution verändern will |
 
 ## So liest man das Ergebnis
 
@@ -73,6 +73,13 @@ erlaubt es, mehrere davon auf einmal zu entfernen – aber nur dort, wo das eind
 möglich ist. Alles andere wird als "nicht automatisch entfernbar" markiert, damit nichts
 Ungewolltes gelöscht wird. Vor dem eigentlichen Löschen gibt es immer eine Bestätigung mit
 Vorschau.
+
+## Woher wissen wir, dass die Prüfungen die richtigen Dinge finden?
+
+Die Prüfungen orientieren sich an real aufgetretenen Import-/Uninstall-Fehlern aus der Praxis.
+[KNOWN_ISSUES.md](KNOWN_ISSUES.md) zeigt eine konkrete Liste solcher Fehlerbilder (mit Fehlercode)
+und ob bzw. wodurch Solution Preflight sie erkennt – und erklärt auch, warum ein paar sehr
+spezifische oder rein technische/transiente Fälle bewusst nicht automatisiert wurden.
 
 ## Installation & Nutzung
 

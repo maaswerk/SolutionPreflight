@@ -291,13 +291,18 @@ namespace SolutionPreflight
 
                     var checks = new List<IPreflightCheck>
                     {
+                        new SolutionPackageIntegrityCheck(),
                         new MissingComponentsCheck(),
                         new PublisherMismatchCheck(),
                         new ManagedUnmanagedCheck(),
+                        new SolutionVersionCheck(),
+                        new PlatformVersionCheck(),
                         new SolutionLayerCheck(),
+                        new DependentComponentsCheck(),
                         new ConnectionReferenceCheck(),
                         new CloudFlowCheck(),
                         new MetadataCheck(),
+                        new FormXmlCheck(),
                         new PcfCheck(),
                         new EnvironmentVariableCheck(),
                         new SecurityRoleCheck(),
