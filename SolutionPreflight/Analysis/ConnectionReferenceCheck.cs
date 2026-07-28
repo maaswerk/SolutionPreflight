@@ -32,6 +32,15 @@ namespace SolutionPreflight.Analysis
                 return findings;
             }
 
+            // A connection reference that doesn't exist in the target yet is completely normal for a
+            // solution that has never been imported there before - Dataverse creates it during import
+            // and the import dialog itself prompts you to pick/create the connection for it. That's
+            // not a problem to flag loudly. It only becomes worth a real warning once the solution is
+            // already installed in the target and a reference that should already be there and mapped
+            // has gone missing (e.g. someone deleted it, or a Cloud Flow can't republish - see error
+            // 80095005 "Failed to find connection references with logical name(s)").
+            var solutionAlreadyInTarget = SolutionExistsInTarget(context);
+
             foreach (var sourceRef in sourceRefs.Entities)
             {
                 var logicalName = sourceRef.GetAttributeValue<string>("connectionreferencelogicalname");
@@ -53,14 +62,19 @@ namespace SolutionPreflight.Analysis
                 {
                     findings.Add(new PreflightFinding
                     {
-                        Severity = Severity.Blocker,
+                        // First-time import: this is expected, not a defect - the import dialog will
+                        // ask you to map it. Already installed before: more likely something is wrong.
+                        Severity = solutionAlreadyInTarget ? Severity.Warning : Severity.Info,
                         Category = Category,
                         ComponentName = displayName,
                         ComponentType = "Connection Reference",
-                        Message = $"Connection reference '{displayName}' ({logicalName}) does not exist in the target " +
-                                  "(it will be created empty by the import, without a connection).",
-                        SuggestedFix = "After import, open the connection reference in the target and set its connection, " +
-                                       "or pre-create/map it before importing so Cloud Flows can be turned on immediately.",
+                        Message = solutionAlreadyInTarget
+                            ? $"Connection reference '{displayName}' ({logicalName}) no longer exists in the target, even " +
+                              "though this solution is already installed there. A Cloud Flow using it may fail to publish/activate."
+                            : $"Connection reference '{displayName}' ({logicalName}) doesn't exist in the target yet - this is " +
+                              "expected for a first-time import. You'll be prompted to select or create its connection during import.",
+                        SuggestedFix = "During (or right after) import, open the connection reference in the target and set its " +
+                                       "connection so any Cloud Flow using it can be turned on.",
                         CheckName = Name
                     });
                     continue;
@@ -84,6 +98,16 @@ namespace SolutionPreflight.Analysis
             }
 
             return findings;
+        }
+
+        private static bool SolutionExistsInTarget(PreflightContext context)
+        {
+            var query = new QueryExpression("solution")
+            {
+                ColumnSet = new ColumnSet("solutionid")
+            };
+            query.Criteria.AddCondition("uniquename", ConditionOperator.Equal, context.SourceSolution.UniqueName);
+            return context.TargetService.RetrieveMultiple(query).Entities.Count > 0;
         }
     }
 }

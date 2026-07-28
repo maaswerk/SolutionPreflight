@@ -7,11 +7,14 @@ using SolutionPreflight.Models;
 namespace SolutionPreflight.Analysis
 {
     /// <summary>
-    /// If a component this solution touches already has an active *unmanaged* customization on top
-    /// of it in the target (from some other, unrelated unmanaged work), a managed update for that
-    /// component can import successfully yet not visibly take effect until the unmanaged layer is
-    /// removed or reconciled. This check flags components whose current top layer in the target
-    /// belongs to a different, unmanaged solution.
+    /// If a component this solution touches already has an active layer from some other, unrelated
+    /// solution in the target, that can bite in two ways: an unmanaged layer can silently hide a
+    /// managed update, or - just as commonly seen in practice - a stale/unrelated *managed* solution
+    /// holding a base layer on the same component can block a later uninstall/upgrade outright
+    /// (Dataverse error 8004F020, "the uninstall operation will delete the base layer for component
+    /// '...' ... blocked by other managed layers", seen for components like RibbonCustomization,
+    /// EntityRelationship, EntityMap/AttributeMap and CustomAPIResponseProperty). Both cases are
+    /// flagged here; only the wording differs since the fix differs slightly.
     ///
     /// See <see cref="Layers.SolutionLayerService"/> for the companion bulk-removal feature.
     /// </summary>
@@ -62,17 +65,22 @@ namespace SolutionPreflight.Analysis
 
                     findings.Add(new PreflightFinding
                     {
-                        Severity = ownedByUnmanaged ? Severity.Warning : Severity.Info,
+                        // Both cases have been observed in practice to cause real import/uninstall
+                        // failures, not just cosmetic layering quirks - worth a Warning either way.
+                        Severity = Severity.Warning,
                         Category = Category,
                         ComponentName = componentName,
                         ComponentType = "Solution Component",
                         Message = ownedByUnmanaged
                             ? $"Component '{componentName}' currently has an active unmanaged customization from solution " +
                               $"'{solutionName}' on top of it in the target. A managed update may not visibly apply until this is addressed."
-                            : $"Component '{componentName}' currently has its active layer owned by solution '{solutionName}' in the target.",
+                            : $"Component '{componentName}' currently has its active layer owned by another managed solution " +
+                              $"('{solutionName}') in the target. If this solution later needs to remove or replace this " +
+                              "component, that other solution can block it (Dataverse error 8004F020, \"blocked by other managed layers\").",
                         SuggestedFix = ownedByUnmanaged
                             ? "Review and, if appropriate, remove the unmanaged layer using the Solution Layers tab before importing."
-                            : "Usually fine for managed-on-managed layering; verify if unexpected.",
+                            : $"If you run into 8004F020 later, identify and remove/upgrade '{solutionName}' first - it's usually an old, " +
+                              "unrelated solution nobody remembers is still holding this component.",
                         CheckName = Name
                     });
                 }
