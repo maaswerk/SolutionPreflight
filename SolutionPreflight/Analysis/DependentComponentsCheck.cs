@@ -4,6 +4,7 @@ using System.Linq;
 using Microsoft.Crm.Sdk.Messages;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
+using Microsoft.Xrm.Sdk.Metadata;
 using Microsoft.Xrm.Sdk.Query;
 using SolutionPreflight.Models;
 
@@ -22,10 +23,22 @@ namespace SolutionPreflight.Analysis
     /// that owns the *dependent* (the thing relying on our component) - which is exactly what lets this
     /// check tell "a component from this same solution" apart from "a component from some other,
     /// unrelated solution" without needing to interpret the numeric component-type codes at all.
+    ///
+    /// Naming a component in the finding is a separate problem: `msdyn_componentlayer` (already used
+    /// elsewhere in this tool) only knows about components that were ever actually layered/customized,
+    /// so plenty of base/system components fall back to their raw id there. To do better without
+    /// guessing at the ~200 numeric component-type codes, this check additionally resolves the
+    /// `componenttype` choice's label *dynamically* from its own metadata (so the type shown is never
+    /// hardcoded), and special-cases the single most common metadata-backed type - Entity - via
+    /// <c>RetrieveEntityRequest.MetadataId</c>, which is a genuine, documented way to resolve an
+    /// entity's name from its raw metadata id.
     /// </summary>
     public class DependentComponentsCheck : IPreflightCheck
     {
         private const int BatchSize = 50;
+
+        /// <summary>The well-known, stable numeric value for the "Entity" component type.</summary>
+        private const int EntityComponentType = 1;
 
         public string Name => "Dependent Components";
 
@@ -52,7 +65,10 @@ namespace SolutionPreflight.Analysis
                 ownNames.Add(context.SourceSolution.FriendlyName);
             }
 
-            var displayInfo = GetComponentDisplayInfo(context.TargetService, components.Select(c => c.ObjectId).ToList());
+            var layerDisplayInfo = GetComponentDisplayInfoFromLayers(context.TargetService, components.Select(c => c.ObjectId).ToList());
+            var typeLabels = GetComponentTypeLabels(context.TargetService);
+            var entityNameCache = new Dictionary<Guid, string>();
+
             var batches = Batch(components, BatchSize).ToList();
 
             for (var b = 0; b < batches.Count; b++)
@@ -122,9 +138,8 @@ namespace SolutionPreflight.Analysis
                     }
 
                     var component = batch[i];
-                    displayInfo.TryGetValue(component.ObjectId, out var info);
-                    var hasFriendlyName = !string.IsNullOrEmpty(info.Name);
-                    var componentLabel = hasFriendlyName ? $"{info.Name} ({info.TypeName})" : $"component {component.ObjectId}";
+                    var (componentLabel, componentTypeLabel) = DescribeComponent(
+                        context.TargetService, component, layerDisplayInfo, typeLabels, entityNameCache);
                     var solutionList = string.Join(", ", solutionNames);
 
                     findings.Add(new PreflightFinding
@@ -132,8 +147,8 @@ namespace SolutionPreflight.Analysis
                         Severity = Severity.Warning,
                         Category = Category,
                         ComponentName = componentLabel,
-                        ComponentType = hasFriendlyName ? info.TypeName : "Solution Component",
-                        Message = $"In the target, '{componentLabel}' is currently depended on by component(s) from other, " +
+                        ComponentType = componentTypeLabel,
+                        Message = $"In the target, {componentLabel} is currently depended on by component(s) from other, " +
                                   $"unrelated solution(s): {solutionList}. If this import changes, replaces, or removes this " +
                                   "component, those solutions can block the operation later or break outright (Dataverse error " +
                                   "8004F020 and similar \"solution dependencies exist\" errors).",
@@ -145,6 +160,101 @@ namespace SolutionPreflight.Analysis
             }
 
             return findings;
+        }
+
+        /// <summary>
+        /// Builds the best available "&lt;Type&gt; '&lt;name&gt;'" description for a component, in order of
+        /// preference: a name from msdyn_componentlayer, then (for entities specifically) a live
+        /// metadata lookup, then just the dynamically-resolved type label with a shortened id.
+        /// </summary>
+        private static (string Label, string TypeLabel) DescribeComponent(
+            IOrganizationService targetService,
+            (Guid ObjectId, int ComponentType) component,
+            Dictionary<Guid, (string Name, string TypeName)> layerDisplayInfo,
+            Dictionary<int, string> typeLabels,
+            Dictionary<Guid, string> entityNameCache)
+        {
+            typeLabels.TryGetValue(component.ComponentType, out var typeLabel);
+            typeLabel = typeLabel ?? $"type {component.ComponentType}";
+
+            if (layerDisplayInfo.TryGetValue(component.ObjectId, out var info) && !string.IsNullOrEmpty(info.Name))
+            {
+                var resolvedType = !string.IsNullOrEmpty(info.TypeName) ? info.TypeName : typeLabel;
+                return ($"{resolvedType} '{info.Name}'", resolvedType);
+            }
+
+            if (component.ComponentType == EntityComponentType)
+            {
+                var entityName = ResolveEntityName(targetService, component.ObjectId, entityNameCache);
+                if (!string.IsNullOrEmpty(entityName))
+                {
+                    return ($"Entity '{entityName}'", "Entity");
+                }
+            }
+
+            var shortId = component.ObjectId.ToString().Substring(0, 8);
+            return ($"{typeLabel} ({shortId}...)", typeLabel);
+        }
+
+        private static string ResolveEntityName(IOrganizationService targetService, Guid metadataId, Dictionary<Guid, string> cache)
+        {
+            if (cache.TryGetValue(metadataId, out var cached))
+            {
+                return cached;
+            }
+
+            try
+            {
+                var response = (RetrieveEntityResponse)targetService.Execute(new RetrieveEntityRequest
+                {
+                    MetadataId = metadataId,
+                    EntityFilters = EntityFilters.Entity
+                });
+
+                var name = response.EntityMetadata?.LogicalName;
+                cache[metadataId] = name;
+                return name;
+            }
+            catch (Exception)
+            {
+                cache[metadataId] = null;
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Resolves the `solutioncomponent.componenttype` choice's value-&gt;label mapping straight from
+        /// its own metadata, so the type shown in a finding is never a hardcoded/guessed number.
+        /// </summary>
+        private static Dictionary<int, string> GetComponentTypeLabels(IOrganizationService targetService)
+        {
+            var result = new Dictionary<int, string>();
+
+            try
+            {
+                var response = (RetrieveAttributeResponse)targetService.Execute(new RetrieveAttributeRequest
+                {
+                    EntityLogicalName = "solutioncomponent",
+                    LogicalName = "componenttype"
+                });
+
+                if (response.AttributeMetadata is EnumAttributeMetadata enumMetadata && enumMetadata.OptionSet?.Options != null)
+                {
+                    foreach (var option in enumMetadata.OptionSet.Options)
+                    {
+                        if (option.Value.HasValue)
+                        {
+                            result[option.Value.Value] = option.Label?.UserLocalizedLabel?.Label;
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Degrade gracefully - callers fall back to "type {n}".
+            }
+
+            return result;
         }
 
         private static List<(Guid ObjectId, int ComponentType)> GetSourceComponents(PreflightContext context)
@@ -165,7 +275,7 @@ namespace SolutionPreflight.Analysis
                 .ToList();
         }
 
-        private static Dictionary<Guid, (string Name, string TypeName)> GetComponentDisplayInfo(IOrganizationService targetService, List<Guid> objectIds)
+        private static Dictionary<Guid, (string Name, string TypeName)> GetComponentDisplayInfoFromLayers(IOrganizationService targetService, List<Guid> objectIds)
         {
             var result = new Dictionary<Guid, (string, string)>();
 
