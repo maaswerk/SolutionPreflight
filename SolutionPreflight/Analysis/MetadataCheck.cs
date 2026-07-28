@@ -68,14 +68,54 @@ namespace SolutionPreflight.Analysis
                     continue;
                 }
 
+                // Best-effort: source metadata is only used for the type/primary-name comparisons
+                // below, so a failure here shouldn't stop the plain existence check further down.
+                EntityMetadata sourceMetadata = null;
+                try
+                {
+                    var sourceResponse = (RetrieveEntityResponse)context.SourceService.Execute(new RetrieveEntityRequest
+                    {
+                        LogicalName = entity.EntityLogicalName,
+                        EntityFilters = EntityFilters.Attributes
+                    });
+                    sourceMetadata = sourceResponse.EntityMetadata;
+                }
+                catch (Exception)
+                {
+                    // Ignore - see comment above.
+                }
+
+                if (sourceMetadata != null &&
+                    !string.IsNullOrEmpty(sourceMetadata.PrimaryNameAttribute) &&
+                    !string.IsNullOrEmpty(targetMetadata.PrimaryNameAttribute) &&
+                    !string.Equals(sourceMetadata.PrimaryNameAttribute, targetMetadata.PrimaryNameAttribute, StringComparison.OrdinalIgnoreCase))
+                {
+                    findings.Add(new PreflightFinding
+                    {
+                        Severity = Severity.Warning,
+                        Category = Category,
+                        ComponentName = entity.EntityLogicalName,
+                        ComponentType = "Entity",
+                        Message = $"Entity '{entity.EntityLogicalName}' has a different primary name attribute in the source " +
+                                  $"('{sourceMetadata.PrimaryNameAttribute}') than in the target ('{targetMetadata.PrimaryNameAttribute}').",
+                        SuggestedFix = "Align the primary name attribute between environments before importing - a mismatch here " +
+                                       "has been known to make the import fail outright.",
+                        CheckName = Name
+                    });
+                }
+
                 var targetAttributes = targetMetadata.Attributes
+                    .Where(a => !string.IsNullOrEmpty(a.LogicalName))
+                    .ToDictionary(a => a.LogicalName, a => a, StringComparer.OrdinalIgnoreCase);
+
+                var sourceAttributes = sourceMetadata?.Attributes
                     .Where(a => !string.IsNullOrEmpty(a.LogicalName))
                     .ToDictionary(a => a.LogicalName, a => a, StringComparer.OrdinalIgnoreCase);
 
                 foreach (var physicalName in entity.AttributePhysicalNames)
                 {
                     var logicalName = physicalName.ToLowerInvariant();
-                    if (!targetAttributes.ContainsKey(logicalName))
+                    if (!targetAttributes.TryGetValue(logicalName, out var targetAttribute))
                     {
                         findings.Add(new PreflightFinding
                         {
@@ -86,6 +126,25 @@ namespace SolutionPreflight.Analysis
                             Message = $"Attribute '{logicalName}' on entity '{entity.EntityLogicalName}' is referenced by the " +
                                       "solution's customizations but was not found in the target's entity metadata.",
                             SuggestedFix = "Verify this attribute is included in the solution or already exists in the target.",
+                            CheckName = Name
+                        });
+                        continue;
+                    }
+
+                    if (sourceAttributes != null && sourceAttributes.TryGetValue(logicalName, out var sourceAttribute) &&
+                        sourceAttribute.AttributeType.HasValue && targetAttribute.AttributeType.HasValue &&
+                        sourceAttribute.AttributeType.Value != targetAttribute.AttributeType.Value)
+                    {
+                        findings.Add(new PreflightFinding
+                        {
+                            Severity = Severity.Blocker,
+                            Category = Category,
+                            ComponentName = $"{entity.EntityLogicalName}.{logicalName}",
+                            ComponentType = "Attribute",
+                            Message = $"Attribute '{logicalName}' on '{entity.EntityLogicalName}' is a {sourceAttribute.AttributeType} " +
+                                      $"in the source but a {targetAttribute.AttributeType} in the target.",
+                            SuggestedFix = "Align the attribute type between source and target before importing - Dataverse rejects " +
+                                           "a type change on an existing field (e.g. Customer vs. Lookup).",
                             CheckName = Name
                         });
                     }

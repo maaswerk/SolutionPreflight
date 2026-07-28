@@ -300,7 +300,8 @@ namespace SolutionPreflight
                         new MetadataCheck(),
                         new PcfCheck(),
                         new EnvironmentVariableCheck(),
-                        new SecurityRoleCheck()
+                        new SecurityRoleCheck(),
+                        new PluginAssemblyVersionCheck()
                     };
 
                     var findings = new List<PreflightFinding>();
